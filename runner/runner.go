@@ -130,7 +130,7 @@ func New(options *Options) (*runner, error) {
 	}
 	r.freeport = tmpFreeport
 	gologger.Infof("获取FreePort:%d\n", tmpFreeport)
-	r.dnsid = 65500 // set dnsid 65500
+	r.dnsid = 0x2021 // set dnsid 65500
 	r.maxRetry = r.options.Retry
 	r.timeout = int64(r.options.TimeOut)
 	r.lock = sync.RWMutex{}

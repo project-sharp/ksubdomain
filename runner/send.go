@@ -62,7 +62,7 @@ func (r *runner) send(domain string, dnsname string) {
 	dns := &layers.DNS{
 		ID:      r.dnsid,
 		QDCount: 1,
-		RD:      false, //递归查询标识
+		RD:      true, //递归查询标识
 	}
 	dns.Questions = append(dns.Questions,
 		layers.DNSQuestion{
