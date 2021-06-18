@@ -125,9 +125,8 @@ func GetIpv4Devices() (keys []string, data map[string]net.IP) {
 	}
 	return
 }
-func GetDevices(options *Options) EthTable {
+func GetDevices(defaultSelect int) EthTable {
 	// Find all devices
-	defaultSelect := options.NetworkId
 	keys, data := GetIpv4Devices()
 
 	if len(keys) == 0 {
@@ -136,9 +135,6 @@ func GetDevices(options *Options) EthTable {
 		defaultSelect = 0
 	}
 	if defaultSelect == -1 {
-		if options.Silent || options.Stdin {
-			gologger.Fatalf("slient模式或Stdin模式下需要指定-e参数\n")
-		}
 		gologger.Infof("选择一个可用网卡ID:")
 		var i int
 		_, err2 := fmt.Scanln(&i)
@@ -155,13 +151,13 @@ func GetDevices(options *Options) EthTable {
 	ip := data[deviceName]
 	gologger.Infof("Use Device: %s\n", deviceName)
 	gologger.Infof("Use IP:%s\n", ip.String())
-	c := GetGateMacAddress(deviceName)
+	c := getGateMacAddress(deviceName)
 	gologger.Infof("Local Mac:%s\n", c[1])
 	gologger.Infof("GateWay Mac:%s\n", c[0])
 	return EthTable{ip, deviceName, c[1], c[0]}
 }
 
-func GetGateMacAddress(dvice string) [2]net.HardwareAddr {
+func getGateMacAddress(dvice string) [2]net.HardwareAddr {
 	// 获取网关mac地址
 	domain := RandomStr(4) + "paper.seebug.org"
 	_signal := make(chan [2]net.HardwareAddr)

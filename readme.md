@@ -7,7 +7,7 @@ ksubdomain的发送和接收是分离且不依赖系统，即使高并发发包�
 类似masscan,这么大的发包速度意味着丢包也会非常严重，ksubdomain有丢包重发机制(这样意味着速度会减小，但比普通的DNS爆破快很多)，会保证每个包都收到DNS服务器的回复，漏报的可能性很小。
 
 ## 优化
-在原ksubdomain的代码上进行了优化
+在原ksubdomain的代码上进行了优化,精简了一些功能，只专注于快速子域名爆破。
 
 ## 常见问题
 - linux下 error while loading shared libraries 报错
