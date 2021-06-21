@@ -39,4 +39,5 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: ksubdomain_latest_${{ runner.os }}_amd64
-          path: ksubdomain-*
+          path: ksubdomain*
+          if-no-files-found: warn
