@@ -73,15 +73,18 @@ func (r *runner) recv() error {
 			continue
 		}
 		atomic.AddUint64(&r.recvIndex, 1)
+		if len(dns.Questions) == 0 {
+			continue
+		}
 		subdomain := string(dns.Questions[0].Name)
+		_ = r.hm.Del(subdomain)
 		if dns.ANCount > 0 {
 			atomic.AddUint64(&r.successIndex, 1)
-			_ = r.hm.Del(subdomain)
-			data := core.RecvResult{
+			result := core.RecvResult{
 				Subdomain: subdomain,
 				Answers:   dns.Answers,
 			}
-			r.recver <- data
+			r.recver <- result
 		}
 	}
 }

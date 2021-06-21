@@ -22,7 +22,6 @@ type Options struct {
 	TTL             bool
 	Verify          bool
 	Stdin           bool
-	Debug           bool
 	DomainLevel     int
 	SkipWildCard    bool
 	SubNameFileName string // 三级域名字典文件
@@ -72,7 +71,14 @@ func ParseOptions() *Options {
 		}
 		options.Resolvers = rs
 	} else {
-		defaultDns := []string{"223.5.5.5", "223.6.6.6", "180.76.76.76", "119.29.29.29", "182.254.116.116", "114.114.114.115"}
+		defaultDns := []string{
+			"223.5.5.5",
+			"223.6.6.6",
+			"180.76.76.76",
+			"119.29.29.29",
+			"182.254.116.116",
+			"114.114.114.115",
+		}
 		options.Resolvers = defaultDns
 	}
 	// handle domain

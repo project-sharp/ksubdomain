@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"github.com/boy-hack/hmap/store/hybrid"
 	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
 	_ "github.com/projectdiscovery/fdmax/autofdmax"
-	"github.com/projectdiscovery/hmap/store/hybrid"
-	ratelimit "golang.org/x/time/rate"
+	"go.uber.org/ratelimit"
 	"io"
 	"ksubdomain/core"
 	"ksubdomain/gologger"
@@ -23,7 +23,7 @@ type runner struct {
 	ether        core.EthTable
 	hm           *hybrid.HybridMap
 	options      *Options
-	limit        *ratelimit.Limiter
+	limit        ratelimit.Limiter
 	handle       *pcap.Handle
 	successIndex uint64
 	sentIndex    uint64
@@ -96,8 +96,7 @@ func New(options *Options) (*runner, error) {
 	if options.Verify && options.FileName != "" {
 		f2, err := os.Open(options.FileName)
 		if err != nil {
-			gologger.Fatalf("\n", options.FileName, err.Error())
-			return nil, errors.New("打开文件:%s 出现错误:%s")
+			return nil, errors.New(fmt.Sprintf("打开文件:%s 出现错误:%s", options.FileName, err.Error()))
 		}
 		defer f2.Close()
 		f = f2
@@ -121,8 +120,8 @@ func New(options *Options) (*runner, error) {
 	gologger.Infof("DNS:%s\n", options.Resolvers)
 
 	r.pcapInit()
-	r.limit = ratelimit.NewLimiter(ratelimit.Every(time.Duration(time.Second.Nanoseconds()/options.Rate)), int(options.Rate))
-	r.sender = make(chan core.StatusTable, r.options.Rate)
+	r.limit = ratelimit.New(int(options.Rate)) // per second
+	r.sender = make(chan core.StatusTable, 1000)
 	r.recver = make(chan core.RecvResult)
 	tmpFreeport, err := freeport.GetFreePort()
 	if err != nil {
@@ -134,7 +133,6 @@ func New(options *Options) (*runner, error) {
 	r.maxRetry = r.options.Retry
 	r.timeout = int64(r.options.TimeOut)
 	r.lock = sync.RWMutex{}
-
 	go r.loadTargets(f)
 	return r, nil
 }
@@ -156,6 +154,11 @@ func (r *runner) pcapInit() {
 	}
 }
 func (r *runner) loadTargets(f io.Reader) {
+	hm, err := hybrid.New(hybrid.DefaultDiskOptions)
+	defer hm.Close()
+	if err != nil {
+		return
+	}
 	reader := bufio.NewReader(f)
 	for {
 		line, _, err := reader.ReadLine()
@@ -165,27 +168,25 @@ func (r *runner) loadTargets(f io.Reader) {
 		msg := string(line)
 		if r.options.Verify {
 			// send msg
-			r.sender <- core.StatusTable{
-				Domain:      msg,
-				Dns:         r.ChoseDns(),
-				Time:        0,
-				Retry:       0,
-				DomainLevel: 0,
-			}
+			hm.Set(msg, nil)
 		} else {
 			for _, tmpDomain := range r.options.Domain {
 				newDomain := msg + "." + tmpDomain
-				// send newdomain
-				r.sender <- core.StatusTable{
-					Domain:      newDomain,
-					Dns:         r.ChoseDns(),
-					Time:        0,
-					Retry:       0,
-					DomainLevel: 0,
-				}
+				hm.Set(newDomain, nil)
 			}
 		}
 	}
+	hm.Scan(func(byte_domain []byte, bytes2 []byte) error {
+		domain := string(byte_domain)
+		r.sender <- core.StatusTable{
+			Domain:      domain,
+			Dns:         r.ChoseDns(),
+			Time:        0,
+			Retry:       0,
+			DomainLevel: 0,
+		}
+		return nil
+	})
 }
 func (r *runner) PrintStatus() {
 	gologger.Printf("\rSuccess:%d Sent:%d Recved:%d Faild:%d", r.successIndex, r.sentIndex, r.recvIndex, r.faildIndex)
@@ -195,13 +196,18 @@ func (r *runner) RunEnumeration() {
 	go r.handleResult() // 处理结果，打印输出
 	go r.sendCycle()    // 发送线程
 	go r.retry()        // 遍历hm，依次重试
-	// 主循环
-	for {
-		time.Sleep(time.Millisecond * 500)
-		r.PrintStatus()
-		if r.hm.Size() == 0 {
+	// 主循环 go太快了，先循环等r.hm有值
+	now := time.Now().Unix()
+	for empty, _ := r.hm.Empty(); empty; {
+		time.Sleep(time.Millisecond * 200)
+		if time.Now().Unix()-now >= 5 {
 			break
 		}
+	}
+	// r.hm 有值了，再循环等待它没值
+	for empty, _ := r.hm.Empty(); !empty; {
+		r.PrintStatus()
+		time.Sleep(time.Millisecond * 300)
 	}
 	gologger.Printf("\n")
 	for i := 5; i >= 0; i-- {
