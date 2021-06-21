@@ -118,8 +118,10 @@ func New(options *Options) (*runner, error) {
 	}
 	gologger.Infof("设置rate:%dpps\n", options.Rate)
 	gologger.Infof("DNS:%s\n", options.Resolvers)
-
-	r.pcapInit()
+	r.handle, err = core.PcapInit(ether.Device)
+	if err != nil {
+		return nil, err
+	}
 	r.limit = ratelimit.New(int(options.Rate)) // per second
 	r.sender = make(chan core.StatusTable, 1000)
 	r.recver = make(chan core.RecvResult)
@@ -140,19 +142,7 @@ func (r *runner) ChoseDns() string {
 	dns := r.options.Resolvers
 	return dns[rand.Intn(len(dns))]
 }
-func (r *runner) pcapInit() {
-	var (
-		snapshot_len int32 = 1024
-		//promiscuous  bool  = false
-		err     error
-		timeout time.Duration = -1 * time.Second
-	)
-	r.handle, err = pcap.OpenLive(r.ether.Device, snapshot_len, false, timeout)
-	if err != nil {
-		gologger.Fatalf("pcap初始化失败:%s\n", err.Error())
-		return
-	}
-}
+
 func (r *runner) loadTargets(f io.Reader) {
 	hm, err := hybrid.New(hybrid.DefaultDiskOptions)
 	defer hm.Close()

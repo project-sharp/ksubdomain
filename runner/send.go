@@ -5,6 +5,8 @@ import (
 	"encoding/gob"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"ksubdomain/core"
 	"ksubdomain/gologger"
 	"net"
 	"sync/atomic"
@@ -29,14 +31,15 @@ func (r *runner) sendCycle() {
 			continue
 		}
 		_ = r.hm.Set(sender.Domain, buff.Bytes())
-		r.send(sender.Domain, sender.Dns)
+		send(sender.Domain, sender.Dns, r.ether, r.dnsid, uint16(r.freeport), r.handle)
+		atomic.AddUint64(&r.sentIndex, 1)
 	}
 }
-func (r *runner) send(domain string, dnsname string) {
+func send(domain string, dnsname string, ether core.EthTable, dnsid uint16, freeport uint16, handle *pcap.Handle) {
 	DstIp := net.ParseIP(dnsname).To4()
 	eth := &layers.Ethernet{
-		SrcMAC:       r.ether.SrcMac,
-		DstMAC:       r.ether.DstMac,
+		SrcMAC:       ether.SrcMac,
+		DstMAC:       ether.DstMac,
 		EthernetType: layers.EthernetTypeIPv4,
 	}
 	// Our IPv4 header
@@ -51,17 +54,17 @@ func (r *runner) send(domain string, dnsname string) {
 		TTL:        255,
 		Protocol:   layers.IPProtocolUDP,
 		Checksum:   0,
-		SrcIP:      r.ether.SrcIp,
+		SrcIP:      ether.SrcIp,
 		DstIP:      DstIp,
 	}
 	// Our UDP header
 	udp := &layers.UDP{
-		SrcPort: layers.UDPPort(r.freeport),
+		SrcPort: layers.UDPPort(freeport),
 		DstPort: layers.UDPPort(53),
 	}
 	// Our DNS header
 	dns := &layers.DNS{
-		ID:      r.dnsid,
+		ID:      dnsid,
 		QDCount: 1,
 		//RD:      true, //递归查询标识
 	}
@@ -85,9 +88,8 @@ func (r *runner) send(domain string, dnsname string) {
 	if err != nil {
 		gologger.Warningf("SerializeLayers faild:%s\n", err.Error())
 	}
-	err = r.handle.WritePacketData(buf.Bytes())
+	err = handle.WritePacketData(buf.Bytes())
 	if err != nil {
 		gologger.Warningf("WritePacketDate error:%s\n", err.Error())
 	}
-	atomic.AddUint64(&r.sentIndex, 1)
 }

@@ -224,3 +224,17 @@ func getGateMacAddress(dvice string) [2]net.HardwareAddr {
 END:
 	return c
 }
+func PcapInit(devicename string) (*pcap.Handle, error) {
+	var (
+		snapshot_len int32 = 1024
+		//promiscuous  bool  = false
+		err     error
+		timeout time.Duration = -1 * time.Second
+	)
+	handle, err := pcap.OpenLive(devicename, snapshot_len, false, timeout)
+	if err != nil {
+		gologger.Fatalf("pcap初始化失败:%s\n", err.Error())
+		return nil, err
+	}
+	return handle, nil
+}
