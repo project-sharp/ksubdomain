@@ -1,9 +1,9 @@
 name: Build
-
 on:
-  push:
-    branches: [ master ]
-
+  create:
+    tags:
+      - v*
+  workflow_dispatch:
 jobs:
 
   build:
@@ -40,4 +40,4 @@ jobs:
         with:
           name: ksubdomain_latest_${{ runner.os }}_amd64
           path: ksubdomain*
-          if-no-files-found: warn
+          if-no-files-found: error
