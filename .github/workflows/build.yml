@@ -1,4 +1,4 @@
-name: Build
+name: 🎉 Build Binary 哈哈
 on:
   create:
     tags:
